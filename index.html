@@ -2,34 +2,153 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>bütün Works — coming soon</title>
-<meta name="description" content="bütün Works builds apps and agentic AI systems. Coming soon.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>bütün Works</title>
+<meta name="description" content="bütün Works is a small studio in Istanbul. We build apps and agentic AI systems.">
+<meta name="theme-color" content="#010002">
 <link rel="icon" href="mark.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="canonical" href="https://butun.works/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="bütün Works">
+<meta property="og:title" content="bütün Works">
+<meta property="og:description" content="A small studio in Istanbul. We build apps and agentic AI systems.">
+<meta property="og:url" content="https://butun.works/">
+<meta property="og:image" content="https://butun.works/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The bütün Works logo and name on black">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root { --bg: #010002; --fg: #FEFFFD; --muted: #A9AAA8; }
+  :root { --bg: #010002; --fg: #FEFFFD; --muted: #A9AAA8; --line: #1f1f21; --soft: #cfd0ce; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); }
-  body { font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; min-height: 100vh; }
-  main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 48px 16px; gap: 28px; }
-  .mark { width: min(220px, 50vw); height: auto; }
-  .word { font-family: Oswald, sans-serif; font-weight: 600; font-size: clamp(44px, 9vw, 72px); line-height: 1; letter-spacing: 1px; margin: 0; }
-  .word span { display: block; font-weight: 500; font-size: 0.34em; letter-spacing: 0.9em; margin: 14px 0 0 0.9em; color: var(--muted); text-transform: none; }
-  .line { margin: 0; font-size: clamp(18px, 2.4vw, 22px); line-height: 1.5; max-width: 34ch; color: var(--fg); }
-  .soon { font-size: 15px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
-  footer { padding: 24px 16px; text-align: center; font-size: 14px; color: var(--muted); }
-  a { color: var(--fg); }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body { font: 16px/1.55 Inter, system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: var(--fg); text-underline-offset: 3px; }
+  a:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; border-radius: 2px; }
+  .wrap { position: relative; max-width: 720px; margin: 0 auto; padding-block: 56px 0;
+    padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); }
+
+  /* The logo with the wordmark to its right (in-1054). */
+  .brand { display: flex; align-items: center; gap: clamp(18px, 4vw, 28px); }
+  .logo { position: relative; flex: none; width: clamp(64px, 18vw, 96px); aspect-ratio: 457 / 640; }
+  .logo img { display: block; width: 100%; height: 100%; transition: opacity .6s ease; }
+  .word { font: 600 clamp(40px, 11vw, 64px)/1 Oswald, sans-serif; letter-spacing: 1px; margin: 0; }
+  .word span { display: block; font-weight: 500; font-size: .34em; letter-spacing: .9em; margin: .5em 0 0 .1em; color: var(--muted); }
+
+  /* While the points gather, the real logo waits underneath; it comes back once they settle. */
+  .gathering .logo img { opacity: 0; transition: none; }  /* gone at once; fades back in only at the end */
+  #points { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity .6s ease; }
+  #points.done { opacity: 0; }
+
+  .line { font-size: clamp(21px, 5.2vw, 27px); line-height: 1.35; max-width: 22ch; margin: 40px 0 0; text-wrap: balance; }
+  .sub { color: var(--muted); margin: 14px 0 0; max-width: 46ch; }
+  h2 { font: 500 13px/1 Inter, sans-serif; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); margin: 64px 0 16px; }
+
+  .app { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 16px; padding-block: 20px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .tile { width: 56px; height: 56px; border-radius: 14px; display: block; }
+  .app h3 { font: 600 24px/1 Oswald, sans-serif; letter-spacing: .5px; margin: 2px 0 8px; }
+  .app p { margin: 0; color: var(--soft); max-width: 48ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 14px; color: var(--muted); }
+
+  .mail { font: 500 clamp(24px, 6.5vw, 32px)/1.2 Oswald, sans-serif; letter-spacing: .5px; text-decoration: none; }
+  .mail:hover { text-decoration: underline; }
+
+  footer { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 72px; padding-block: 24px max(40px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  footer a { color: var(--muted); }
 </style>
 </head>
 <body>
-<main>
-  <img class="mark" src="mark.png" alt="bütün Works logo mark">
-  <h1 class="word">bütün<span>Works</span></h1>
-  <p class="line">We build apps and agentic AI systems.</p>
-  <p class="soon">Coming soon</p>
-</main>
-<footer>© 2026 bütün Works · Istanbul · <a href="/privacy/">Privacy</a></footer>
+<div class="wrap" id="top">
+  <header class="brand">
+    <div class="logo"><img id="mark" src="mark.png" width="457" height="640" alt="bütün Works"></div>
+    <h1 class="word">bütün<span>Works</span></h1>
+  </header>
+
+  <main>
+    <p class="line">We build apps and agentic AI systems.</p>
+    <p class="sub">A small studio in Istanbul. Each app does one job, carefully.</p>
+
+    <h2>Apps</h2>
+    <article class="app">
+      <img class="tile" src="apps/gardro.png" width="56" height="56" alt="">
+      <div>
+        <h3>Gardro</h3>
+        <p>Screenshot any outfit, save the pieces, mix them with yours and try the look on.</p>
+        <div class="meta">
+          <span>Android · coming to Google Play</span>
+          <a href="https://gardro.butun.works/privacy/">Privacy</a>
+          <a href="https://gardro.butun.works/delete-account/">Delete account</a>
+        </div>
+      </div>
+    </article>
+
+    <h2>Contact</h2>
+    <a class="mail" href="mailto:hello@butun.works">hello@butun.works</a>
+  </main>
+
+  <footer>
+    <span>© 2026 bütün Works · Istanbul</span>
+    <a href="/privacy/">Privacy</a>
+  </footer>
+</div>
+
+<script>
+// Opening moment (in-1030, in-1054): scattered points gather into the logo, then the real logo takes over.
+// It plays once per page load. With reduced motion, without canvas, or if anything fails, the logo just shows.
+(() => {
+  const img = document.getElementById("mark"), top = document.getElementById("top");
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !window.HTMLCanvasElement) return;
+  const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  canvas.id = "points"; canvas.setAttribute("aria-hidden", "true");
+
+  const ready = img.decode ? img.decode() : new Promise((r) => (img.complete ? r() : (img.onload = r)));
+  ready.then(() => {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const area = top.getBoundingClientRect(), box = img.getBoundingClientRect();
+    // The points fly in across the first screen of the page and land on the logo.
+    const W = area.width, H = Math.min(area.height, window.innerHeight);
+    canvas.style.height = H + "px"; canvas.width = W * dpr; canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Sample the logo's own pixels at screen resolution, so the grey base stays grey.
+    const lw = Math.round(box.width), lh = Math.round(box.height);
+    const off = document.createElement("canvas"); off.width = lw; off.height = lh;
+    const o = off.getContext("2d"); o.drawImage(img, 0, 0, lw, lh);
+    const px = o.getImageData(0, 0, lw, lh).data, step = 2, pts = [];
+    const ox = box.left - area.left, oy = box.top - area.top;
+    for (let y = 0; y < lh; y += step) for (let x = 0; x < lw; x += step) {
+      const i = (y * lw + x) * 4;
+      if (px[i + 3] < 140) continue;
+      pts.push({ hx: ox + x, hy: oy + y, sx: Math.random() * W, sy: Math.random() * H,
+        d: Math.random() * 260, c: `rgb(${px[i]},${px[i + 1]},${px[i + 2]})` });
+    }
+    if (!pts.length) return;
+
+    top.prepend(canvas); top.classList.add("gathering");
+    const DUR = 1200, ease = (t) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));  // expo-out, 1.2 s
+    const t0 = performance.now(), end = DUR + 260;
+    function frame(now) {
+      const t = now - t0;
+      ctx.clearRect(0, 0, W, H);
+      for (const p of pts) {
+        const k = ease(Math.max(0, t - p.d) / DUR);
+        ctx.fillStyle = p.c;
+        ctx.fillRect(p.sx + (p.hx - p.sx) * k, p.sy + (p.hy - p.sy) * k, 1.6, 1.6);
+      }
+      if (t < end) return requestAnimationFrame(frame);
+      top.classList.remove("gathering");               // the real logo fades in under the settled points
+      canvas.classList.add("done");
+      setTimeout(() => canvas.remove(), 700);          // nothing keeps running once it has played
+    }
+    requestAnimationFrame(frame);
+  }).catch(() => {});
+})();
+</script>
 </body>
 </html>
