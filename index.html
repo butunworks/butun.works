@@ -19,6 +19,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="The bütün Works logo and name on black">
 <meta name="twitter:card" content="summary_large_image">
+<script>if (!matchMedia("(prefers-reduced-motion: reduce), (forced-colors: active)").matches) document.documentElement.classList.add("pending");</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
@@ -39,10 +40,13 @@
   .word { font: 600 clamp(40px, 11vw, 64px)/1 Oswald, sans-serif; letter-spacing: 1px; margin: 0; }
   .word span { display: block; font-weight: 500; font-size: .34em; letter-spacing: .9em; margin: .5em 0 0 .1em; color: var(--muted); }
 
-  /* While the points gather, the real logo waits underneath; it comes back once they settle. */
-  .gathering .logo img { opacity: 0; transition: none; }  /* gone at once; fades back in only at the end */
-  #points { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity .6s ease; }
-  #points.done { opacity: 0; }
+  /* The opening (in-1129). Until the points are ready the page waits under a cover that lifts by itself after
+     2.5 s; while they gather the page stays hidden, then fades in over them as they land. */
+  .pending .wrap > * { opacity: 0; animation: reveal .2s ease 2.5s both; }
+  @keyframes reveal { from { opacity: 0; } to { opacity: 1; } }
+  .wrap > * { transition: opacity .35s ease; }
+  .boot .wrap > * { opacity: 0; transition: none; }
+  #points { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
 
   .line { font-size: clamp(21px, 5.2vw, 27px); line-height: 1.35; max-width: 22ch; margin: 40px 0 0; text-wrap: balance; }
   .sub { color: var(--muted); margin: 14px 0 0; max-width: 46ch; }
@@ -98,56 +102,193 @@
 </div>
 
 <script>
-// Opening moment (in-1030, in-1054): scattered points gather into the logo, then the real logo takes over.
-// It plays once per page load. With reduced motion, without canvas, or if anything fails, the logo just shows.
+// The opening (in-1030, in-1129): the whole first screen arrives as points, the way the personal site's render does
+// it. Everything on screen joins: every word, the logo, the app tile, the hairlines. Each point bursts out around
+// its own place and comes back in a few denoising steps, big type before small; then the real page fades in over
+// the landed points. It plays once per load. Reduced motion, no WebGL, a slow start or any error: the page shows.
 (() => {
-  const img = document.getElementById("mark"), top = document.getElementById("top");
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !window.HTMLCanvasElement) return;
-  const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  canvas.id = "points"; canvas.setAttribute("aria-hidden", "true");
+  const html = document.documentElement, wrap = document.getElementById("top");
+  const DUR = 1100, NOISE = 140, SETTLE = 400, LATE = 2200;
+  const uncover = () => html.classList.remove("pending", "boot");
+  if (!html.classList.contains("pending")) return;
+  const pictures = [...wrap.querySelectorAll("img")];
+  Promise.all([document.fonts && document.fonts.ready, ...pictures.map((img) => (img.decode ? img.decode() : null) || null)].map((p) => Promise.resolve(p).catch(() => {})))
+    .then(() => (performance.now() > LATE ? uncover() : start()))
+    .catch(uncover);
 
-  const ready = img.decode ? img.decode() : new Promise((r) => (img.complete ? r() : (img.onload = r)));
-  ready.then(() => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const area = top.getBoundingClientRect(), box = img.getBoundingClientRect();
-    // The points fly in across the first screen of the page and land on the logo.
-    const W = area.width, H = Math.min(area.height, window.innerHeight);
-    canvas.style.height = H + "px"; canvas.width = W * dpr; canvas.height = H * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // Sample the logo's own pixels at screen resolution, so the grey base stays grey.
-    const lw = Math.round(box.width), lh = Math.round(box.height);
-    const off = document.createElement("canvas"); off.width = lw; off.height = lh;
-    const o = off.getContext("2d"); o.drawImage(img, 0, 0, lw, lh);
-    const px = o.getImageData(0, 0, lw, lh).data, step = 2, pts = [];
-    const ox = box.left - area.left, oy = box.top - area.top;
-    for (let y = 0; y < lh; y += step) for (let x = 0; x < lw; x += step) {
-      const i = (y * lw + x) * 4;
-      if (px[i + 3] < 140) continue;
-      pts.push({ hx: ox + x, hy: oy + y, sx: Math.random() * W, sy: Math.random() * H,
-        d: Math.random() * 260, c: `rgb(${px[i]},${px[i + 1]},${px[i + 2]})` });
-    }
-    if (!pts.length) return;
-
-    top.prepend(canvas); top.classList.add("gathering");
-    const DUR = 1200, ease = (t) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));  // expo-out, 1.2 s
-    const t0 = performance.now(), end = DUR + 260;
-    function frame(now) {
-      const t = now - t0;
-      ctx.clearRect(0, 0, W, H);
-      for (const p of pts) {
-        const k = ease(Math.max(0, t - p.d) / DUR);
-        ctx.fillStyle = p.c;
-        ctx.fillRect(p.sx + (p.hx - p.sx) * k, p.sy + (p.hy - p.sy) * k, 1.6, 1.6);
+  // Every lit pixel of what is on screen becomes a point: [x, y, r, g, b, a, seed, size].
+  function rasterize(W, H) {
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    const x = c.getContext("2d", { willReadFrequently: true }), out = [];
+    const take = (r, size) => {
+      const x0 = Math.max(0, Math.floor(r.left) - 2), y0 = Math.max(0, Math.floor(r.top) - 2);
+      const x1 = Math.min(W, Math.ceil(r.right) + 2), y1 = Math.min(H, Math.ceil(r.bottom) + 2);
+      if (x1 <= x0 || y1 <= y0) return;
+      const d = x.getImageData(x0, y0, x1 - x0, y1 - y0).data, w = x1 - x0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 70) continue;
+        const k = i / 4;
+        out.push(x0 + (k % w) + 0.5, y0 + Math.floor(k / w) + 0.5, d[i] / 255, d[i + 1] / 255, d[i + 2] / 255, Math.min(1, d[i + 3] / 210), Math.random(), size);
       }
-      if (t < end) return requestAnimationFrame(frame);
-      top.classList.remove("gathering");               // the real logo fades in under the settled points
-      canvas.classList.add("done");
-      setTimeout(() => canvas.remove(), 700);          // nothing keeps running once it has played
+      x.clearRect(x0, y0, x1 - x0, y1 - y0);
+    };
+    const onScreen = (r) => r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < H && r.right > 0 && r.left < W;
+
+    // text, word by word where the browser put it (a word split across lines goes letter by letter)
+    const walker = document.createTreeWalker(wrap, NodeFilter.SHOW_TEXT), range = document.createRange();
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.textContent.trim()) continue;
+      range.selectNodeContents(n);
+      const box = range.getBoundingClientRect();
+      if (!onScreen(box)) continue;
+      const cs = getComputedStyle(n.parentElement), fs = parseFloat(cs.fontSize);
+      x.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      x.fillStyle = cs.color; x.textBaseline = "alphabetic";
+      const spacing = cs.letterSpacing === "normal" ? "0px" : cs.letterSpacing;
+      const perChar = !("letterSpacing" in x) && spacing !== "0px";
+      if ("letterSpacing" in x) x.letterSpacing = spacing;
+      const shown = cs.textTransform === "uppercase" ? (s) => s.toUpperCase() : (s) => s;
+      const m = x.measureText("Hg");
+      const asc = m.fontBoundingBoxAscent || fs * 0.8, desc = m.fontBoundingBoxDescent || fs * 0.2;
+      const base = (r) => r.top + (r.height - (asc + desc)) / 2 + asc;
+      for (let w, re = /\S+/g; (w = re.exec(n.textContent)); ) {
+        range.setStart(n, w.index); range.setEnd(n, w.index + w[0].length);
+        const pieces = perChar || range.getClientRects().length > 1
+          ? [...w[0]].map((ch, k) => [ch, w.index + k, w.index + k + ch.length]) : [[w[0], w.index, w.index + w[0].length]];
+        for (const [t, a, b] of pieces) {
+          range.setStart(n, a); range.setEnd(n, b);
+          const r = [...range.getClientRects()].filter((q) => q.width > 0).pop();
+          if (r) x.fillText(shown(t), r.left, base(r));
+        }
+      }
+      // links keep their underline: one hairline under each line of the text
+      if (cs.textDecorationLine.includes("underline")) {
+        range.selectNodeContents(n);
+        const off = parseFloat(cs.textUnderlineOffset) || 2;
+        for (const r of range.getClientRects()) if (r.width) x.fillRect(r.left, Math.round(base(r) + off), r.width, 1);
+      }
+      take({ left: box.left, top: box.top, right: box.right, bottom: box.bottom + 6 }, fs);
     }
-    requestAnimationFrame(frame);
-  }).catch(() => {});
+    // pictures: the logo and the app tile, with their rounded corners
+    for (const img of pictures) {
+      const r = img.getBoundingClientRect();
+      if (!onScreen(r) || !img.naturalWidth) continue;
+      const rad = parseFloat(getComputedStyle(img).borderTopLeftRadius) || 0;
+      x.save();
+      if (rad && x.roundRect) { x.beginPath(); x.roundRect(r.left, r.top, r.width, r.height, rad); x.clip(); }
+      x.drawImage(img, r.left, r.top, r.width, r.height);
+      x.restore();
+      take(r, img.id === "mark" ? 64 : 28);
+    }
+    // the hairlines around the app and above the footer
+    for (const el of wrap.querySelectorAll("*")) {
+      const cs = getComputedStyle(el);
+      for (const [width, style, color, top] of [["borderTopWidth", "borderTopStyle", "borderTopColor", true], ["borderBottomWidth", "borderBottomStyle", "borderBottomColor", false]]) {
+        const bw = parseFloat(cs[width]);
+        if (!bw || cs[style] === "none") continue;
+        const r = el.getBoundingClientRect(), y = top ? r.top : r.bottom - bw;
+        const line = { left: r.left, top: y, right: r.right, bottom: y + bw };
+        if (!onScreen(line)) continue;
+        x.fillStyle = cs[color];
+        x.fillRect(line.left, line.top, r.width, bw);
+        take(line, 14);
+      }
+    }
+    return new Float32Array(out);
+  }
+
+  const VS = `
+    attribute vec2 aP; attribute vec4 aC; attribute vec2 aM;
+    uniform float uT, uTime, uNoise, uDpr, uSettle, uScroll; uniform vec2 uRes;
+    varying vec4 vC;
+    float field(vec2 q, float t) {
+      float a = sin(q.x * 0.011 + t * 0.0007 + 2.0 * sin(q.y * 0.007 - t * 0.0005));
+      float b = sin(q.y * 0.013 - t * 0.0006 + 2.0 * sin(q.x * 0.009 + t * 0.0004));
+      return 0.5 + 0.25 * a + 0.25 * b;
+    }
+    void main() {
+      float seed = aM.x, size = aM.y;
+      // big type lands first
+      float order = clamp((size - 12.0) / 48.0, 0.0, 1.0);
+      float delay = 0.08 + fract(seed * 3.17) * 0.12 + (1.0 - order) * 0.16;
+      float u = clamp((uT - delay) / 0.62, 0.0, 1.0);
+      float e = u >= 1.0 ? 1.0 : 1.0 - pow(2.0, -10.0 * u);
+      // radial directions with a soft radius, never a box; nine denoising steps, each with a fresh small jitter
+      float ang = seed * 43.98 + uTime * 0.0019;
+      vec2 n = vec2(cos(ang), sin(ang)) * (0.4 + 0.6 * fract(seed * 13.1));
+      float k = floor(u * 9.0);
+      float ha = fract(sin(seed * 91.7 + k * 12.9) * 43758.5) * 6.2832;
+      float hr = min(1.8, sqrt(-2.0 * log(max(1e-4, fract(sin(seed * 47.3 + k * 78.2) * 24634.6)))) * 0.55);
+      vec2 dir = mix(n, vec2(cos(ha), sin(ha)) * hr, smoothstep(0.35, 0.6, u));
+      float rise = smoothstep(0.0, 0.1, uT), stepd = min(1.0, ceil((1.0 - u) * 9.0) / 9.0 * 1.6);
+      float dis = rise * max(stepd, 1.0 - e);
+      float spread = 0.45 + 1.1 * fract(seed * 5.31);   // each point its own distance, so the cloud edges feather
+      vec2 p = aP + dir * uNoise * rise * stepd * spread;
+      p.y -= uScroll;
+      vec4 c = aC;
+      c.a *= rise * (1.0 - uSettle);
+      // scattered points take their brightness from a drifting surface
+      c.rgb = min(c.rgb * mix(1.0, (0.3 + field(p, uTime)) * (0.6 + 0.8 * fract(seed * 71.3)), dis), vec3(1.0));
+      vec2 clip = p / uRes * 2.0 - 1.0;
+      gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
+      gl_PointSize = uDpr * (1.15 + 0.3 * clamp((size - 16.0) / 32.0, 0.0, 1.0));
+      vC = c;
+    }`;
+  const FS = `precision mediump float; varying vec4 vC; void main() { gl_FragColor = vec4(vC.rgb * vC.a, vC.a); }`;
+
+  function start() {
+    const canvas = document.createElement("canvas");
+    try {
+      const W = html.clientWidth, H = html.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const data = rasterize(W, H), count = data.length / 8;
+      const gl = count && canvas.getContext("webgl", { alpha: true, antialias: false, premultipliedAlpha: true });
+      if (!gl) return uncover();
+      const prog = gl.createProgram();
+      for (const [type, src] of [[gl.VERTEX_SHADER, VS], [gl.FRAGMENT_SHADER, FS]]) {
+        const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+        gl.attachShader(prog, s);
+      }
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+      gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+      for (const [name, n, at] of [["aP", 2, 0], ["aC", 4, 2], ["aM", 2, 6]]) {
+        const loc = gl.getAttribLocation(prog, name);
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, n, gl.FLOAT, false, 32, at * 4);
+      }
+      const U = {};
+      for (const name of ["uT", "uTime", "uNoise", "uDpr", "uSettle", "uScroll", "uRes"]) U[name] = gl.getUniformLocation(prog, name);
+      canvas.id = "points"; canvas.setAttribute("aria-hidden", "true");
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+      document.body.append(canvas);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.uniform2f(U.uRes, W, H); gl.uniform1f(U.uDpr, dpr); gl.uniform1f(U.uNoise, NOISE);
+      canvas.addEventListener("webglcontextlost", () => { canvas.remove(); uncover(); });
+
+      const t0 = performance.now(), y0 = scrollY;
+      let landed = false;
+      const frame = (now) => {
+        const ms = now - t0, settle = Math.min(1, Math.max(0, (ms - DUR) / SETTLE));
+        if (ms >= DUR && !landed) { landed = true; html.classList.remove("boot"); }   // the real page fades in over the points
+        gl.uniform1f(U.uT, Math.min(1, ms / DUR)); gl.uniform1f(U.uTime, ms);
+        gl.uniform1f(U.uSettle, settle); gl.uniform1f(U.uScroll, scrollY - y0);
+        gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.drawArrays(gl.POINTS, 0, count);
+        if (settle < 1) return requestAnimationFrame(frame);
+        canvas.remove();                                    // nothing keeps running once it has played
+        const lose = gl.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext();
+      };
+      html.classList.add("boot");
+      html.classList.remove("pending");
+      requestAnimationFrame(frame);
+    } catch (err) {
+      canvas.remove(); uncover();
+    }
+  }
 })();
 </script>
 </body>

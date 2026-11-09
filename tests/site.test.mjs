@@ -57,3 +57,27 @@ test('share preview and icons', () => {
   assert.ok(existsSync(new URL('../og.png', import.meta.url)));
   assert.ok(existsSync(new URL('../apple-touch-icon.png', import.meta.url)));
 });
+
+// in-1129: the opening covers the whole screen and every rendered thing joins it, as on the personal site.
+test('the points cover the whole screen, not the content column', () => {
+  assert.match(html, /#points\s*\{[^}]*position:\s*fixed[^}]*inset:\s*0/);
+  assert.doesNotMatch(html, /top\.prepend\(canvas\)/);
+});
+
+test('every rendered thing joins the opening: text, pictures and lines', () => {
+  assert.match(html, /createTreeWalker\([^)]*SHOW_TEXT/);          // every text node, word by word
+  assert.match(html, /querySelectorAll\("img"\)/);                 // the logo and the app tile
+  assert.match(html, /border(Top|Bottom)Width/);                   // the hairlines
+  assert.match(html, /textTransform/);                              // uppercase labels drawn as shown
+});
+
+test('points scatter radially around their place, never from a box', () => {
+  assert.doesNotMatch(html, /Math\.random\(\)\s*\*\s*W/);
+  assert.match(html, /vec2\(cos\(ang\), sin\(ang\)\)/);
+});
+
+test('the page is never left hidden', () => {
+  // the content waits under a cover that lifts by itself after 2.5 s, whatever the script does
+  assert.match(html, /\.pending \.wrap > \*\s*\{[^}]*animation:[^}]*2\.5s/);
+  assert.match(html, /classList\.remove\("pending"/);
+});
