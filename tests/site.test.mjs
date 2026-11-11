@@ -28,8 +28,8 @@ test('studio lines, the app and its legal links', () => {
   assert.ok(existsSync(new URL('../apps/gardro.png', import.meta.url)));
   assert.match(text, /Screenshot any outfit, save the pieces, mix them with yours and try the look on\./);
   assert.match(text, /Android · coming to Google Play/);
-  assert.match(html, /href="https:\/\/gardro\.butun\.works\/privacy\/"/);
-  assert.match(html, /href="https:\/\/gardro\.butun\.works\/delete-account\/"/);
+  assert.match(html, /href="https:\/\/getgardro\.com\/privacy\/"/);
+  assert.match(html, /href="https:\/\/getgardro\.com\/delete-account\/"/);
 });
 
 test('contact and footer', () => {
